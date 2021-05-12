@@ -42,4 +42,11 @@ public class UserServiceImpl implements UserService {
             throw new CustomException(ErrorCode.DATA_UPDATE_FAILED);
         }
     }
+
+    @Override
+    public void freezeAccount(String username) {
+        if(userMapper.updateStatus(username) != 1){
+            throw new CustomException(ErrorCode.DATA_UPDATE_FAILED);
+        }
+    }
 }

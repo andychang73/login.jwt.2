@@ -7,6 +7,11 @@
         SET last_login_time = #{time}
         WHERE id = #{id}
     </update>
+    <update id="updateStatus">
+        UPDATE user
+        SET status = 0
+        WHERE username = #{username}
+    </update>
 
     <select id="countByUsername" resultType="java.lang.Integer">
         SELECT COUNT(id)

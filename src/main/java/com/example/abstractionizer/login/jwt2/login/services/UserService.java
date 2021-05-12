@@ -13,4 +13,6 @@ public interface UserService {
     User getUserByName(String username);
 
     void updateLastLoginTime(Integer userId, Date lastLoginTime);
+
+    void freezeAccount(String username);
 }

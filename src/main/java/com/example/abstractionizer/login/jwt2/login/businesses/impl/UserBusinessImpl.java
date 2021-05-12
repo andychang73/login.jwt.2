@@ -13,6 +13,7 @@ import com.example.abstractionizer.login.jwt2.models.bo.UserLoginBo;
 import com.example.abstractionizer.login.jwt2.models.bo.UserRegisterBo;
 import com.example.abstractionizer.login.jwt2.models.vo.UserInfoVo;
 import com.example.abstractionizer.login.jwt2.utils.DateUtil;
+import com.example.abstractionizer.login.jwt2.utils.RedisUtil;
 import com.example.abstractionizer.login.jwt2.utils.Util;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -30,6 +32,7 @@ public class UserBusinessImpl implements UserBusiness {
     private final VerificationTokenService verificationTokenService;
     private final UserTokenService userTokenService;
     private final Util util;
+    private final RedisUtil redisUtil;
 
 
     @Override
@@ -61,7 +64,7 @@ public class UserBusinessImpl implements UserBusiness {
 
         User user = isAccountValid(bo.getUsername());
 
-        checkPassword(bo.getPassword(), user.getPassword());
+        checkPassword(bo, user.getPassword());
 
         final String token = userTokenService.generateToken(bo.getUsername()).orElseThrow(() -> new RuntimeException("Failed to generate token"));
         Optional<String> oldToken = userTokenService.getOldTokenIfExists(token);
@@ -88,10 +91,27 @@ public class UserBusinessImpl implements UserBusiness {
         });
     }
 
-    private void checkPassword(String enteredPassword, String password){
-        if(!util.md5(enteredPassword).equals(password)){
+    private void checkPassword(UserLoginBo bo, String password){
+        if(!util.md5(bo.getPassword()).equals(password)){
+            if(countLoginFailure(bo.getUsername()) >= 3){
+                userService.freezeAccount(bo.getUsername());
+                throw new CustomException(ErrorCode.ACCOUNT_FROZEN);
+            }
             throw new CustomException(ErrorCode.INVALID_CREDENTIAL);
         }
+    }
+
+    private Long countLoginFailure(String username){
+        String key = RedisConstant.getUserLoginFailureCount(username);
+        Long count = 1L;
+
+        if(!redisUtil.isKeyExists(key)){
+            redisUtil.set(key, count, 1L, TimeUnit.MINUTES);
+        }else{
+            count = redisUtil.incr(key, count);
+        }
+        log.info("[User][Login] failure count: {}", count);
+        return count;
     }
 
     private User isAccountValid(String username){
